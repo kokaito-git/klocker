@@ -2,7 +2,7 @@ import threading
 from typeguard import typechecked
 
 
-class ThreadLocalState:
+class SimpleThreadLocalState:
     """Clase para manejar el estado específico de cada hilo."""
     __slots__ = ('_thread_local',)
 
@@ -12,7 +12,18 @@ class ThreadLocalState:
     @property
     def acquired(self) -> bool:
         """Obtiene el estado de 'acquired' para el hilo actual."""
-        return getattr(self._thread_local, 'acquired', False)
+        return self._thread_local.acquired
+
+    @property
+    def waited(self) -> bool:
+        """Retorna True si el Thread tuvo que esperar para bloquear."""
+        return self._thread_local.waited
+
+    @waited.setter
+    @typechecked
+    def waited(self, value: bool):
+        """Establece 'waited' para el hilo actual."""
+        self._thread_local.waited = value
 
     @acquired.setter
     @typechecked
@@ -21,5 +32,6 @@ class ThreadLocalState:
         self._thread_local.acquired = value
 
     def reset(self):
-        """Resetea el estado de 'acquired' para el hilo actual."""
+        """Resetea/Inicializa todas las variables para el hilo actual."""
         self._thread_local.acquired = False
+        self._thread_local.waited = False
