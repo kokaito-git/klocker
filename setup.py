@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 setup(
     author="kokaito-git",
     name="klocker",
-    version="0.1.0.0",
+    version="0.1.2.0",
     description="KLocker",
     author_email="kokaito.git@gmail.com",
     url="https://github.com/kokaito-git/klocker",
@@ -16,6 +16,7 @@ setup(
         "License :: OSI Approved :: MIT License",
     ],
     install_requires=[
+        "kmodels",
         "typeguard",
     ],
     packages=find_packages(),
