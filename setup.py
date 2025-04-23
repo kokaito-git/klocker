@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 setup(
     author="kokaito-git",
     name="klocker",
-    version="0.1.2.0",
+    version="0.1.3.0",
     description="KLocker",
     author_email="kokaito.git@gmail.com",
     url="https://github.com/kokaito-git/klocker",

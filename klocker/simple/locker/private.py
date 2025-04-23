@@ -10,8 +10,9 @@ from klocker.simple.constants import ON_LOCKED_T, LOCK_FAILURE_T, CALLBACK_T, P,
 from klocker.simple.locker.config import SimpleLockerConfigHandler, SimpleLockerConfigController
 from klocker.simple.locker.proxy import SimpleLockerProxy
 from klocker.simple.user import SimpleLockerUserInterface
-from klocker.simple.thread.state import SimpleThreadLockFailureDetails
+from klocker.simple.thread.state import SimpleThreadLockFailure
 from klocker.simple.thread.thread import SimpleLocalThreadController, SimpleLocalThreadHandler
+
 
 
 class SimpleLockerPrivate:
@@ -139,24 +140,16 @@ class SimpleLockerPrivate:
     @staticmethod
     def _handle_failure(
             failure_reason: LOCK_FAILURE_T | Unset,
-            exception: BaseException
-    ) -> SimpleThreadLockFailureDetails | Unset:
-        """
-        Handles failure details when the lock cannot be acquired.
-
-        :param failure_reason: The reason for the failure ('leave', 'timeout', 'stop_event', or 'exception').
-        :param exception: The exception raised during the failure, if any.
-
-        :return: A `ThreadLockFailureDetails` object with the failure details, or `Unset` if no failure occurred.
-        """
+            exception: BaseException | Unset
+    ) -> SimpleThreadLockFailure | Unset:
         if isinstance(failure_reason, Unset):
             return unset
-        else:
-            if failure_reason == 'exception':
-                failure_details = SimpleThreadLockFailureDetails(reason=failure_reason, exception=exception)
-            else:
-                failure_details = SimpleThreadLockFailureDetails(reason=failure_reason)
-        return failure_details
+
+        result = unset
+        if not isinstance(failure_reason, Unset):
+            result = SimpleThreadLockFailure(reason=failure_reason, exception=exception)
+
+        return result
 
     def _callback_handler(
             self,

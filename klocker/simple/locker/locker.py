@@ -11,8 +11,13 @@ from klocker.simple.locker.config import SimpleLockerConfig, SimpleLockerConfigH
 from klocker.simple.locker.private import SimpleLockerPrivate
 from klocker.simple.locker.proxy import SimpleLockerProxy
 from klocker.simple.user import SimpleLockerUserInterface
-from klocker.simple.thread.state import SimpleThreadLockFailureDetails
+from klocker.simple.thread.state import SimpleThreadLockFailure, SimpleThreadExecutionFailure
 from klocker.simple.thread.thread import SimpleLocalThreadController, SimpleLocalThreadHandler
+
+"""
+_failue_details: actualizar (en private)
+agregar get y set también a la config
+"""
 
 
 class SimpleLocker(SimpleLockerPrivate):
@@ -156,7 +161,7 @@ class SimpleLocker(SimpleLockerPrivate):
 
         _failure_reason: LOCK_FAILURE_T | Unset = unset
         _exception: BaseException | Unset = unset
-        _failure_details: SimpleThreadLockFailureDetails | Unset = unset
+        _failure_details: SimpleThreadLockFailure | Unset = unset
         try:
             while True:
                 # Stopping at the beginning of the loop to avoid unnecessary lapses
@@ -184,7 +189,6 @@ class SimpleLocker(SimpleLockerPrivate):
                 elif _on_locked == 'leave':
                     _failure_reason = 'leave'
                     break
-
         except BaseException as e:
             _failure_reason = 'exception'
             _exception = e
@@ -237,6 +241,7 @@ class SimpleLocker(SimpleLockerPrivate):
         """
         self.exit()
 
+    @typechecked
     def with_locker(
             self,
             func: Callable[[Concatenate[SimpleLockerUserInterface, P]], R],
@@ -245,7 +250,7 @@ class SimpleLocker(SimpleLockerPrivate):
             on_locked: ON_LOCKED_T | Unset = unset,
             timeout: float | None | Unset = unset,
             **kwargs,
-    ):
+    ) -> R | Unset:
         """
         Executes a function within the context of the locker.
 
@@ -261,17 +266,28 @@ class SimpleLocker(SimpleLockerPrivate):
                         configuration if `Unset`.
         """
 
+        result = unset
+
         # We enter the locker (custom config for this call is allowed)
         self.enter(on_locked=on_locked, timeout=timeout)
         # We separate the callback from the function to be executed (or not if callback is 'func')
         if not self.ui.thread.state.acquired:
             # Si sinos hemos obtenido el bloqueo delegamos al _callback_handler
             self._callback_handler(func=func, callback=callback)
-            return
+            return result
 
         # Llamamos a la función si hemos obtenido el bloqueo
-        func(self.ui, *args, **kwargs)
+        try:
+            result = func(self.ui, *args, **kwargs)
+        except BaseException as e:
+            # Actualizamos failure_details a excepción de thread (error diferente a un error al adquirir el lock)
+            failure_details = SimpleThreadExecutionFailure(reason='exception', exception=e)
+            self._thread_controller.state.update(failure_details=failure_details)
+            # También llamamos al _callback_handler
+            self._callback_handler(func=func, callback=callback)
+
         self.exit()
+        return result
 
     def sleep(self, duration: float = 2.0, *, sleep_time: float = 0.1) -> bool:
         """
