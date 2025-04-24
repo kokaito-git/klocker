@@ -139,8 +139,10 @@ class Test:
 
 
 def test():
-    locker = SimpleLocker(config=SimpleLockerConfig(on_locked='wait', timeout=3.9))
-    testing = Test(locker, n_threads=10, worker_duration=0.5, worker_sleep_time=0.1, exception_rate=4)
+    locker = SimpleLocker(
+        config=SimpleLockerConfig(on_locked='wait', timeout=None, max_waiters=None, stop_event_delay=0.1)
+    )
+    testing = Test(locker, n_threads=10, worker_duration=5., worker_sleep_time=0.1, exception_rate=None)
     try:
         # testing.using_locker_directly()
         # testing.using_with_locker_everything_in_one()

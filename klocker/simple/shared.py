@@ -11,6 +11,7 @@ class SimpleBaseLockerThreadConfig(CoreModel):
 
     on_locked: ON_LOCKED_T = 'wait'
     timeout: float | None = Field(default=None, ge=0.0)
+    max_waiters: int | None = Field(default=None, gt=0)
 
     @model_validator(mode='after')
     def _post_init(self) -> Self:

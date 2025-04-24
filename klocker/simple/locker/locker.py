@@ -27,11 +27,16 @@ class SimpleLocker(SimpleLockerPrivate):
         self._stop_event = threading.Event()
         self._thread = SimpleLocalThreadHandler()
         self._config = SimpleLockerConfigHandler(config=config)
+
         self._ui: SimpleLockerUserInterface = SimpleLockerUserInterface(
             self,
             config_interface=self._config.interface,
             thread_interface=self._thread.interface
         )
+        # attributes to handle maximum waiters
+        self._waiting_lock = threading.Lock()
+        self._n_waiters: int = 0
+
         self._proxy = SimpleLockerProxy(self)
 
     @property
@@ -117,83 +122,38 @@ class SimpleLocker(SimpleLockerPrivate):
             return
         self._stop_event.clear()
 
-    def _handle_stop_event(self) -> bool:
-        ...
-
     @typechecked
     def enter(
             self,
             *,
             on_locked: ON_LOCKED_T | Unset = unset,
             timeout: float | None | Unset = unset,
+            max_waiters: int | None | Unset = unset,
     ) -> Self:
-        """
-        Attempts to acquire a lock and manage its lifecycle within a specified timeout period.
-        This method is designed to handle scenarios where the lock cannot be immediately
-        acquired and includes customizable behavior for handling contention with other
-        threads or processes. The method also respects stopping signals to ensure that
-        resources are properly managed and no deadlocks occur.
-
-        :param on_locked:
-            Specifies the behavior to be used when the lock is already in use. This can
-            determine how contention is handled, such as waiting for the lock to become
-            available, or exiting immediately based on the value provided. Uses the
-            global configuration value `self.config.on_locked` if omitted or unset.
-
-        :param timeout:
-            The maximum time to wait to acquire the lock, in seconds. If `None`, waits
-            indefinitely. If omitted or unset, defaults to the value configured globally
-            in `self.config.timeout`. Takes precedence over global settings when specified.
-
-        :return:
-            Returns the current instance (`self`) after attempting to acquire the lock,
-            initializing the proper thread-local state and configuration. This ensures
-            that the acquired or waited state is properly synchronized with the caller's
-            expectations.
-        """
-
         _on_locked = on_locked if not isinstance(on_locked, Unset) else self.ui.config.on_locked
         _timeout = timeout if not isinstance(timeout, Unset) else self.ui.config.timeout
+        _max_waiters = max_waiters if not isinstance(max_waiters, Unset) else self.ui.config.max_waiters
 
-        _waited, _acquired = False, False
-        _remaining_timeout = _timeout
-        _start_time = time.monotonic()
-
-        _failure_reason: LOCK_FAILURE_T | Unset = unset
+        _waited = False
+        _failure_reason: LOCK_FAILURE_T | None = None
         _exception: BaseException | Unset = unset
-        _failure_details: SimpleThreadLockFailure | Unset = unset
+
         try:
-            while True:
-                # Stopping at the beginning of the loop to avoid unnecessary lapses
-                if self.is_stopping():
-                    _failure_reason = 'stop_event'
-                    break
-
-                # Try to acquire the lock
-                _acquired, _this_waited = self._try_to_acquire_lock(
-                    remaining_timeout=_remaining_timeout,
-                    on_locked=_on_locked
-                )
-                _waited = any((_this_waited, _waited))
-
-                # Check if timeout is reached
-                if _remaining_timeout is not None:
-                    _remaining_timeout = self._calculate_remaining_timeout(_start_time, _timeout)
-                    if _remaining_timeout is None:
-                        _failure_reason = 'timeout'
-                        break
-
-                # Check if the lock was acquired
-                if _acquired:
-                    break
-                elif _on_locked == 'leave':
-                    _failure_reason = 'leave'
-                    break
+            if _on_locked == 'wait':
+                # We enter the locker with the wait mode
+                _failure_reason, _waited = self._enter_wait(timeout=_timeout, max_waiters=_max_waiters)
+            elif _on_locked == 'leave':
+                # We enter the locker with the leave mode
+                _failure_reason = self._enter_leave()
+            else:
+                raise ValueError(f"Invalid on_locked value: {_on_locked}")
+        # Handle exceptions that may occur during the lock acquisition process
         except BaseException as e:
             _failure_reason = 'exception'
             _exception = e
 
-        # FIX: self.is_stopping() puede haber sucedido tras self._try_to_acquire_lock().
+        # Comprobamos una vez más si el locker está en proceso de detenerse en el último momento
+        _acquired = _failure_reason is None
         if self.is_stopping():
             _failure_reason = 'stop_event'
             if _acquired:
@@ -202,11 +162,13 @@ class SimpleLocker(SimpleLockerPrivate):
 
         # We handle the failure reason and details
         _failure_details = self._handle_failure(_failure_reason, _exception)
-
         # We initialize the thread-local state and config
-        self._thread_controller.config.initialize(on_locked=_on_locked, timeout=_timeout)
-        self._thread_controller.state.initialize(acquired=_acquired, waited=_waited, failure_details=_failure_details)
-
+        self._thread_controller.config.initialize(
+            on_locked=_on_locked, timeout=_timeout, max_waiters=_max_waiters
+        )
+        self._thread_controller.state.initialize(
+            acquired=_acquired, waited=_waited, failure_details=_failure_details
+        )
         # Finally, we return the locker instance
         return self
 
@@ -249,6 +211,7 @@ class SimpleLocker(SimpleLockerPrivate):
             *args,
             on_locked: ON_LOCKED_T | Unset = unset,
             timeout: float | None | Unset = unset,
+            max_waiters: int | None | Unset = unset,
             **kwargs,
     ) -> R | Unset:
         """
@@ -264,12 +227,14 @@ class SimpleLocker(SimpleLockerPrivate):
                           Defaults to the global configuration if `Unset`.
         :param timeout: The maximum time to wait for the lock, in seconds. Defaults to the global
                         configuration if `Unset`.
+        :param max_waiters: The maximum number of waiters allowed. Defaults to the global configuration if `Unset`.
+
         """
 
         result = unset
 
         # We enter the locker (custom config for this call is allowed)
-        self.enter(on_locked=on_locked, timeout=timeout)
+        self.enter(on_locked=on_locked, timeout=timeout, max_waiters=max_waiters)
         # We separate the callback from the function to be executed (or not if callback is 'func')
         if not self.ui.thread.state.acquired:
             # Si sinos hemos obtenido el bloqueo delegamos al _callback_handler

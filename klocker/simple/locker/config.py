@@ -78,6 +78,16 @@ class SimpleLockerConfigInterface(BaseSimpleLockerConfig):
         return self._config.timeout
 
     @property
+    def max_waiters(self) -> int | None:
+        """
+        Returns the maximum waiters.
+
+        Returns:
+            int | None: The maximum waiters value or None.
+        """
+        return self._config.max_waiters
+
+    @property
     def stop_event_delay(self) -> float:
         """
         Returns the stop event delay configuration.
