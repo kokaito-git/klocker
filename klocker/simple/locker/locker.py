@@ -1,23 +1,18 @@
 import threading
 import time
-
 from collections.abc import Callable
 from typing import Self, Concatenate
-from typeguard import typechecked
 
 from kmodels.types import Unset, unset
+from typeguard import typechecked
+
 from klocker.simple.constants import ON_LOCKED_T, LOCK_FAILURE_T, CALLBACK_T, P, R
 from klocker.simple.locker.config import SimpleLockerConfig, SimpleLockerConfigHandler, SimpleLockerConfigController
 from klocker.simple.locker.private import SimpleLockerPrivate
 from klocker.simple.locker.proxy import SimpleLockerProxy
-from klocker.simple.user import SimpleLockerUserInterface
-from klocker.simple.thread.state import SimpleThreadLockFailure, SimpleThreadExecutionFailure
+from klocker.simple.thread.state import SimpleThreadExecutionFailure
 from klocker.simple.thread.thread import SimpleLocalThreadController, SimpleLocalThreadHandler
-
-"""
-_failue_details: actualizar (en private)
-agregar get y set también a la config
-"""
+from klocker.simple.user import SimpleLockerUserInterface
 
 
 class SimpleLocker(SimpleLockerPrivate):
@@ -33,6 +28,7 @@ class SimpleLocker(SimpleLockerPrivate):
             config_interface=self._config.interface,
             thread_interface=self._thread.interface
         )
+
         # attributes to handle maximum waiters
         self._waiting_lock = threading.Lock()
         self._n_waiters: int = 0
@@ -254,6 +250,7 @@ class SimpleLocker(SimpleLockerPrivate):
         self.exit()
         return result
 
+    @typechecked
     def sleep(self, duration: float = 2.0, *, sleep_time: float = 0.1) -> bool:
         """
         Simulates work while respecting the stop signal of the locker.

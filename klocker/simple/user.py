@@ -17,8 +17,13 @@ class SimpleLockerUserInterface:
     and threading interface, as well as methods to check and control its stopping state.
     """
 
-    def __init__(self, locker: SimpleLocker, *, config_interface: SimpleLockerConfigInterface,
-                 thread_interface: SimpleLocalThreadInterface):
+    def __init__(
+            self,
+            locker: SimpleLocker,
+            *,
+            config_interface: SimpleLockerConfigInterface,
+            thread_interface: SimpleLocalThreadInterface
+    ):
         """
         Initialize the LockerUserInterface.
 
