@@ -39,7 +39,6 @@ class SimpleLocalThreadStateInterface(SimpleBaseLocalThreadDataInterface):
 
     @property
     def data(self) -> SimpleLocalThreadState:
-        self._raise_not_initialized()
         return self._local_env.state
 
     @property
@@ -119,13 +118,13 @@ class SimpleLocalThreadStateController(SimpleBaseLocalThreadDataController):
             waited: bool = False,
             failure_details: SimpleThreadFailure | Unset = unset
     ):
-        self._raise_already_initialized()
-        self._local_env.state = SimpleLocalThreadState(
+        state = SimpleLocalThreadState(
             acquired=acquired, waited=waited, failure_details=failure_details
         )
+        self.initialize_from_state(state)
 
     def initialize_from_state(self, state: SimpleLocalThreadState):
-        return self.initialize(acquired=state.acquired, waited=state.waited, failure_details=state.failure_details)
+        self._local_env.state = state
 
     def get(self) -> SimpleLocalThreadState:
         return self._local_env.state
@@ -142,7 +141,4 @@ class SimpleLocalThreadStateController(SimpleBaseLocalThreadDataController):
         _failure_details = failure_details if failure_details is not None else self._local_env.state.failure_details
 
         state = SimpleLocalThreadState(acquired=_acquired, waited=_waited, failure_details=_failure_details)
-        self.update_from_state(state)
-
-    def update_from_state(self, state: SimpleLocalThreadState):
-        self._local_env.state = state
+        self.initialize_from_state(state)

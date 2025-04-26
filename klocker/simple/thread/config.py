@@ -24,7 +24,6 @@ class SimpleLocalThreadConfigInterface(SimpleBaseLocalThreadDataInterface):
 
     @property
     def data(self) -> SimpleLocalThreadConfig:
-        self._raise_not_initialized()
         return self._local_env.config
 
     @property
@@ -56,19 +55,15 @@ class SimpleLocalThreadConfigController(SimpleBaseLocalThreadDataController):
             timeout: float | None,
             max_waiters: int | None
     ):
-        self._raise_already_initialized()
-        self._local_env.config = SimpleLocalThreadConfig(
+        config = SimpleLocalThreadConfig(
             on_locked=on_locked,
             timeout=timeout,
             max_waiters=max_waiters
         )
+        self.initialize_from_config(config)
 
     def initialize_from_config(self, config: SimpleLocalThreadConfig):
-        self.initialize(
-            on_locked=config.on_locked,
-            timeout=config.timeout,
-            max_waiters=config.max_waiters
-        )
+        self._local_env.config = config
 
     def get(self) -> SimpleLocalThreadConfig:
         return self._local_env.config
@@ -85,7 +80,4 @@ class SimpleLocalThreadConfigController(SimpleBaseLocalThreadDataController):
         _max_waiters = max_waiters if not isinstance(max_waiters, Unset) else self._local_env.config.max_waiters
 
         config = SimpleLocalThreadConfig(on_locked=_on_locked, timeout=_timeout, max_waiters=_max_waiters)
-        self.update_from_config(config)
-
-    def update_from_config(self, config: SimpleLocalThreadConfig):
-        self._local_env.config = config
+        self.initialize_from_config(config)

@@ -9,14 +9,6 @@ class SimpleBaseThreadHandler:
     def is_initialized(self) -> bool:
         return hasattr(self._local_env, self._varname)
 
-    def _raise_already_initialized(self):
-        if self.is_initialized():
-            raise RuntimeError("Thread-local state already initialized.")
-
-    def _raise_not_initialized(self):
-        if not self.is_initialized():
-            raise RuntimeError("Thread-local state not initialized. Call init() first.")
-
 
 class SimpleBaseLocalThreadDataInterface(SimpleBaseThreadHandler):
     ...
